@@ -1,5 +1,5 @@
 const axios = require("axios");
-const crypto = require('crypto')
+const crypto = require("crypto");
 
 const apiUrl = "https://promise-hiring.appspot.com/employees";
 
@@ -167,68 +167,97 @@ function standardizeManagers(employeeObj) {
 }
 
 function constructHeirarchy(employeeObj) {
-  let top;
+  let top = [];
   for (const key in employeeObj) {
-    if (!employeeObj[key].hasOwnProperty("managed_by") && employeeObj[key].hasOwnProperty("reports")) {
-      top = {
+    if (!employeeObj[key].hasOwnProperty("managed_by")) {
+      top.push({
         id: employeeObj[key].id,
         email_hash: employeeObj[key].email_hash,
         profile_pic: employeeObj[key].profile_pic,
         reports: employeeObj[key].reports
-      };
+      });
     }
   }
-  return insertReports(employeeObj,top.id);
+  return top.map(e => {
+    return insertReports(employeeObj, e.id);
+  });
 }
 
 function insertReports(employeeObj, employeeID) {
-  if(employeeID===5050){
-    return
-  }
   let newObj = {
     id: employeeID,
     email_hash: employeeObj[employeeID].email_hash,
     profile_pic: employeeObj[employeeID].profile_pic
   };
-  if(employeeObj[employeeID].hasOwnProperty('reports')){
-    newObj.reports = employeeObj[employeeID].reports.map(e=>{
-      return insertReports(employeeObj, e.ref_id)
-    })
+  if (employeeObj[employeeID].hasOwnProperty("reports")) {
+    newObj.reports = employeeObj[employeeID].reports
+      .filter(e => {
+        if (Object.keys(employeeObj).includes(e.ref_id.toString())) {
+          return e;
+        }
+      })
+      .map(e => {
+        return insertReports(employeeObj, e.ref_id);
+      });
   }
-  return newObj
+  return newObj;
 }
 
-function hashEmailsandGrav (employeeObj){
+function hashEmailsandGrav(employeeObj) {
   for (const key in employeeObj) {
-    const hash =  crypto.createHash('md5').update(employeeObj[key].email.toLowerCase()).digest("hex");
-    employeeObj[key].email_hash=hash;
-    employeeObj[key].profile_pic=`https://www.gravatar.com/avatar/${hash}`;
+    const hash = crypto
+      .createHash("md5")
+      .update(employeeObj[key].email.toLowerCase())
+      .digest("hex");
+    employeeObj[key].email_hash = hash;
+    employeeObj[key].profile_pic = `https://www.gravatar.com/avatar/${hash}`;
   }
-  return employeeObj
+  return employeeObj;
 }
 
-getAll().then(test => {
-  let employeeObj = employeeListToObject(test);
+// getAll().then(test => {
+//   let employeeObj = employeeListToObject(test);
+//   employeeObj = ensureCompleteList(employeeObj);
+//   employeeObj = standardizeManagers(employeeObj);
+//   employeeObj = hashEmailsandGrav(employeeObj);
+//   employeeObj = constructHeirarchy(employeeObj);
+//   console.log(employeeObj);
+//   var fs = require("fs");
+//   fs.writeFileSync("myjsonfile.json", JSON.stringify(employeeObj), "utf8");
+//   debugger;
+
+//   axios
+//     .post("https://promise-hiring.appspot.com/result", {
+//       employees: employeeObj
+//     })
+//     .then(function(response) {
+//       console.log(response);
+//       debugger;
+//     })
+//     .catch(function(error) {
+//       console.log(error);
+//     });
+// });
+
+
+async function mainRequest (){
+  let employeeObj = await getAll();
+  employeeObj = employeeListToObject(employeeObj);
   employeeObj = ensureCompleteList(employeeObj);
   employeeObj = standardizeManagers(employeeObj);
   employeeObj = hashEmailsandGrav(employeeObj);
-  employeeObj = constructHeirarchy(employeeObj)
-  console.log(employeeObj);
-  var fs = require('fs');
-fs.writeFileSync('myjsonfile.json', JSON.stringify(employeeObj), 'utf8');
-  debugger;
-
-  
-  axios.post('https://promise-hiring.appspot.com/result', {
-    employees: [employeeObj],
-    
-  })
-  .then(function (response) {
-    console.log(response);
-    debugger;
-
-  })
-  .catch(function (error) {
-    console.log(error);
-  });
-});
+  employeeObj = constructHeirarchy(employeeObj);
+  console.log(employeeObj)
+  axios
+    .post("https://promise-hiring.appspot.com/result", {
+      employees: employeeObj
+    })
+    .then(function(response) {
+      console.log(response);
+      debugger;
+    })
+    .catch(function(error) {
+      console.log(error);
+    });
+}
+mainRequest();
