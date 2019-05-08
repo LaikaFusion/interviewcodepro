@@ -1,4 +1,5 @@
 const axios = require("axios");
+const crypto = require('crypto')
 
 const apiUrl = "https://promise-hiring.appspot.com/employees";
 
@@ -171,7 +172,8 @@ function constructHeirarchy(employeeObj) {
     if (!employeeObj[key].hasOwnProperty("managed_by") && employeeObj[key].hasOwnProperty("reports")) {
       top = {
         id: employeeObj[key].id,
-        email: employeeObj[key].email,
+        email_hash: employeeObj[key].email_hash,
+        profile_pic: employeeObj[key].profile_pic,
         reports: employeeObj[key].reports
       };
     }
@@ -183,10 +185,10 @@ function insertReports(employeeObj, employeeID) {
   if(employeeID===5050){
     return
   }
-  console.log(employeeObj[employeeID])
   let newObj = {
     id: employeeID,
-    email: employeeObj[employeeID].email,
+    email_hash: employeeObj[employeeID].email_hash,
+    profile_pic: employeeObj[employeeID].profile_pic
   };
   if(employeeObj[employeeID].hasOwnProperty('reports')){
     newObj.reports = employeeObj[employeeID].reports.map(e=>{
@@ -196,10 +198,37 @@ function insertReports(employeeObj, employeeID) {
   return newObj
 }
 
+function hashEmailsandGrav (employeeObj){
+  for (const key in employeeObj) {
+    const hash =  crypto.createHash('md5').update(employeeObj[key].email.toLowerCase()).digest("hex");
+    employeeObj[key].email_hash=hash;
+    employeeObj[key].profile_pic=`https://www.gravatar.com/avatar/${hash}`;
+  }
+  return employeeObj
+}
+
 getAll().then(test => {
   let employeeObj = employeeListToObject(test);
   employeeObj = ensureCompleteList(employeeObj);
   employeeObj = standardizeManagers(employeeObj);
-  console.log(constructHeirarchy(employeeObj));
+  employeeObj = hashEmailsandGrav(employeeObj);
+  employeeObj = constructHeirarchy(employeeObj)
+  console.log(employeeObj);
+  var fs = require('fs');
+fs.writeFileSync('myjsonfile.json', JSON.stringify(employeeObj), 'utf8');
   debugger;
+
+  
+  axios.post('https://promise-hiring.appspot.com/result', {
+    employees: [employeeObj],
+    
+  })
+  .then(function (response) {
+    console.log(response);
+    debugger;
+
+  })
+  .catch(function (error) {
+    console.log(error);
+  });
 });
